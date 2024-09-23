@@ -1,0 +1,50 @@
+import requests
+import geopandas as gpd
+import matplotlib.pyplot as plt
+import contextily as ctx
+from datetime import datetime
+
+API_KEY = '43d208f95c5d01af2202a6eba715afac11b8292c'
+
+# Get AQI data for cities around the world
+def get_aqi_data():
+    url = f'https://api.waqi.info/map/bounds/?latlng=-90,-180,90,180&token={API_KEY}'
+    response = requests.get(url)
+    data = response.json()
+    if data['status'] == 'ok':
+        return data['data']
+    else:
+        raise Exception("Error fetching data from AQICN")
+
+# Process data and generate maps
+def generate_map(aqi_data):
+    # Create GeoDataFrame
+    gdf = gpd.GeoDataFrame(aqi_data)
+    gdf['geometry'] = gpd.points_from_xy(gdf['lon'], gdf['lat'])
+    gdf = gdf.set_geometry('geometry')
+
+    # Filter out points without AQI data
+    gdf = gdf[gdf['aqi'] != '-']
+
+    # Convert AQI data to numeric values
+    gdf['aqi'] = gdf['aqi'].astype(float)
+
+    # Get current time
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # Create a map
+    gdf['geometry'] = gpd.points_from_xy(gdf['lon'], gdf['lat'])
+    ax = gdf.plot(column='aqi', cmap='RdYlGn_r', scheme='quantiles', markersize=5, legend=True, figsize=(15, 10))
+    ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik)
+    plt.title(f'Global Real-time Air Quality Index (AQI)\nData Time: {current_time}')
+    plt.xlabel('Longitude')
+    plt.ylabel('Latitude')
+    plt.show()
+
+# Main Function
+def main():
+    aqi_data = get_aqi_data()
+    generate_map(aqi_data)
+
+if __name__ == "__main__":
+    main()
